@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TracSwap Radar — P2P Swap Intelligence on Intercom</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a0f;
+    --surface: #0d1520;
+    --border: #1a2a3a;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff7f;
+    --text: #e0eeff;
+    --muted: #4a6a8a;
+    --danger: #ff3355;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* GRID BG */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* HEADER */
+  header {
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: -1px;
+  }
+  .logo span { color: var(--accent); }
+  .logo sub {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    vertical-align: super;
+    margin-left: 4px;
+  }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .dot-live {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.5; transform:scale(0.8); }
+  }
+
+  /* HERO TICKER */
+  .ticker-strip {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    padding: 10px 0;
+    position: relative;
+  }
+  .ticker-strip::before, .ticker-strip::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 80px;
+    z-index: 2;
+  }
+  .ticker-strip::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
+  .ticker-strip::after { right: 0; background: linear-gradient(-90deg, var(--bg), transparent); }
+  .ticker-inner {
+    display: flex;
+    gap: 48px;
+    animation: ticker 30s linear infinite;
+    white-space: nowrap;
+    width: max-content;
+  }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .tick-item {
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .tick-item .pair { color: var(--muted); }
+  .tick-item .price { color: var(--text); }
+  .tick-item .up { color: var(--accent3); }
+  .tick-item .down { color: var(--danger); }
+
+  /* MAIN LAYOUT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    padding: 32px 0;
+  }
+  @media (max-width: 860px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* PANEL */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel-body { padding: 20px; }
+
+  /* SWAP WIDGET */
+  .swap-widget {}
+  .swap-widget .panel::before {
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+  }
+
+  .token-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.2s;
+  }
+  .token-row:hover { border-color: var(--accent); }
+  .token-info { display: flex; align-items: center; gap: 12px; }
+  .token-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+  }
+  .token-icon.btc { background: rgba(255,153,0,0.15); border-color: rgba(255,153,0,0.4); }
+  .token-icon.usdt { background: rgba(39,174,96,0.15); border-color: rgba(39,174,96,0.4); }
+  .token-icon.trac { background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.3); }
+  .token-label { font-size: 0.85rem; font-weight: 700; }
+  .token-sub { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+  .token-amount {
+    text-align: right;
+  }
+  .amount-input {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-align: right;
+    width: 140px;
+    outline: none;
+  }
+  .amount-input::placeholder { color: var(--muted); }
+  .amount-usd { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+
+  .swap-arrow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0;
+    position: relative;
+  }
+  .swap-arrow-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .swap-arrow-btn:hover {
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: var(--glow);
+    transform: rotate(180deg);
+  }
+
+  .quote-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .quote-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .quote-row .val { color: var(--text); }
+  .quote-row .val.good { color: var(--accent3); }
+  .quote-row .val.warn { color: var(--accent2); }
+
+  .swap-btn {
+    margin-top: 16px;
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none;
+    border-radius: 4px;
+    color: var(--bg);
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .swap-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0);
+    transition: 0.2s;
+  }
+  .swap-btn:hover::after { background: rgba(255,255,255,0.15); }
+  .swap-btn:hover { box-shadow: 0 0 30px rgba(255,107,53,0.5); transform: translateY(-1px); }
+  .swap-btn:active { transform: translateY(0); }
+
+  /* ORDER BOOK */
+  .order-book-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    font-size: 0.65rem;
+  }
+  .ob-col { background: var(--surface); }
+  .ob-col-header {
+    padding: 8px 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .ob-col-header span:last-child { text-align: right; }
+  .ob-row {
+    padding: 6px 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+    transition: opacity 0.3s;
+  }
+  .ob-row .depth-bar {
+    position: absolute;
+    top: 0; bottom: 0;
+    opacity: 0.08;
+    z-index: 0;
+  }
+  .ob-row.ask .depth-bar { background: var(--danger); right: 0; }
+  .ob-row.bid .depth-bar { background: var(--accent3); right: 0; }
+  .ob-row > span { position: relative; z-index: 1; }
+  .ob-row.ask > span:first-child { color: var(--danger); }
+  .ob-row.bid > span:first-child { color: var(--accent3); }
+  .ob-row > span:last-child { text-align: right; color: var(--muted); }
+
+  .spread-row {
+    padding: 8px 12px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+  .spread-row .mid { color: var(--accent); font-weight: 700; font-size: 0.8rem; }
+
+  /* RECENT TRADES */
+  .trade-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+    padding: 7px 0;
+    font-size: 0.65rem;
+    border-bottom: 1px solid rgba(26,42,58,0.5);
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .trade-row .side-buy { color: var(--accent3); }
+  .trade-row .side-sell { color: var(--danger); }
+  .trade-row > span:last-child { text-align: right; color: var(--muted); }
+
+  /* STATS STRIP */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  @media (max-width: 600px) {
+    .stats-strip { grid-template-columns: 1fr 1fr; }
+  }
+  .stat-cell {
+    background: var(--surface);
+    padding: 18px 20px;
+  }
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.3rem;
+    letter-spacing: -0.5px;
+  }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green { color: var(--accent3); }
+  .stat-value.orange { color: var(--accent2); }
+  .stat-change {
+    font-size: 0.62rem;
+    margin-top: 4px;
+    color: var(--muted);
+  }
+  .up-val { color: var(--accent3); }
+  .dn-val { color: var(--danger); }
+
+  /* CHART AREA */
+  .chart-container {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  canvas#priceChart {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .chart-overlay {
+    position: absolute;
+    top: 12px; left: 16px;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  /* AGENT FEED */
+  .agent-feed { max-height: 220px; overflow-y: auto; }
+  .agent-feed::-webkit-scrollbar { width: 3px; }
+  .agent-feed::-webkit-scrollbar-track { background: transparent; }
+  .agent-feed::-webkit-scrollbar-thumb { background: var(--border); }
+  .agent-msg {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(26,42,58,0.5);
+    font-size: 0.68rem;
+    display: flex;
+    gap: 10px;
+    animation: fadeIn 0.4s ease;
+  }
+  .agent-tag {
+    font-size: 0.58rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+    height: fit-content;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+  .agent-tag.maker { background: rgba(0,229,255,0.15); color: var(--accent); }
+  .agent-tag.taker { background: rgba(255,107,53,0.15); color: var(--accent2); }
+  .agent-tag.sys { background: rgba(127,255,127,0.1); color: var(--accent3); }
+  .agent-text { color: var(--muted); line-height: 1.6; }
+  .agent-text strong { color: var(--text); font-weight: 400; }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .trac-addr {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 2px;
+    color: var(--accent3);
+    letter-spacing: 0.5px;
+    word-break: break-all;
+    max-width: 320px;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,10,15,0.85);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.active { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+    transform: translateY(20px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.active .modal { transform: translateY(0); }
+  .modal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+  }
+  .modal h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+  .modal p { font-size: 0.72rem; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
+  .progress-bar {
+    background: var(--bg);
+    border-radius: 2px;
+    height: 4px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    animation: progress 3s ease-in-out forwards;
+  }
+  @keyframes progress {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 28px; height: 28px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .modal-close:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="wrap">
+    <div class="header-inner">
+      <div class="logo">
+        Trac<span>Swap</span> Radar
+        <sub>v0.1 · BETA</sub>
+      </div>
+      <div class="status-bar">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="dot-live"></div>
+          <span>INTERCOM P2P LIVE</span>
+        </div>
+        <span id="agentCount">0 AGENTS ONLINE</span>
+        <span id="clockDisplay">--:--:-- UTC</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker-strip">
+  <div class="ticker-inner" id="tickerInner">
+    <!-- filled by JS x2 for loop -->
+  </div>
+</div>
+
+<!-- STATS STRIP -->
+<div class="wrap">
+  <div class="stats-strip" style="margin-top:24px;">
+    <div class="stat-cell">
+      <div class="stat-label">BTC / USDT</div>
+      <div class="stat-value accent" id="statBtcPrice">$103,847</div>
+      <div class="stat-change"><span class="up-val" id="statBtcChange">+2.14%</span> 24H</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">24H VOL (BTC)</div>
+      <div class="stat-value green" id="statVol">142.38</div>
+      <div class="stat-change">≈ $14.7M NOTIONAL</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">ACTIVE SWAPS</div>
+      <div class="stat-value orange" id="statSwaps">37</div>
+      <div class="stat-change">OVER INTERCOM MESH</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">AVG SETTLE TIME</div>
+      <div class="stat-value" id="statSettle">4.2s</div>
+      <div class="stat-change">HTLC LIGHTNING → SOL</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="wrap">
+  <div class="main-grid">
+
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- PRICE CHART -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">BTC / USDT · 1M CANDLES</span>
+          <span style="font-size:0.62rem;color:var(--muted);">INTERCOM VWAP</span>
+        </div>
+        <div class="panel-body" style="padding:16px;">
+          <div class="chart-container">
+            <div class="chart-overlay">PRICE RADAR</div>
+            <canvas id="priceChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORDER BOOK -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">ORDER BOOK · P2P RFQ</span>
+          <span style="font-size:0.62rem;color:var(--muted);" id="bookUpdate">LIVE</span>
+        </div>
+        <div class="panel-body" style="padding:16px;">
+          <div class="order-book-grid">
+            <div class="ob-col">
+              <div class="ob-col-header">
+                <span>PRICE</span><span>SIZE (BTC)</span><span style="text-align:right">TOTAL</span>
+              </div>
+              <div id="askBook"></div>
+            </div>
+            <div class="ob-col">
+              <div class="ob-col-header">
+                <span>PRICE</span><span>SIZE (BTC)</span><span style="text-align:right">TOTAL</span>
+              </div>
+              <div id="bidBook"></div>
+            </div>
+          </div>
+          <div class="spread-row">
+            <span>SPREAD</span>
+            <span class="mid" id="midPrice">$103,847</span>
+            <span id="spreadVal">$12.40 (0.012%)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECENT TRADES -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">RECENT P2P TRADES</span>
+        </div>
+        <div class="panel-body" style="padding:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;padding:0 0 8px;font-size:0.6rem;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);">
+            <span>SIDE</span><span>PRICE</span><span>SIZE</span><span style="text-align:right">TIME</span>
+          </div>
+          <div id="tradesFeed"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- SWAP WIDGET -->
+      <div class="panel swap-widget">
+        <div class="panel-header">
+          <span class="panel-title">SWAP · NON-CUSTODIAL</span>
+          <span style="font-size:0.62rem;color:var(--accent);">HTLC ⚡</span>
+        </div>
+        <div class="panel-body">
+
+          <!-- FROM -->
+          <div style="font-size:0.6rem;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">YOU PAY</div>
+          <div class="token-row">
+            <div class="token-info">
+              <div class="token-icon btc">₿</div>
+              <div>
+                <div class="token-label">BTC</div>
+                <div class="token-sub">LIGHTNING</div>
+              </div>
+            </div>
+            <div class="token-amount">
+              <input class="amount-input" type="number" id="fromAmount" value="0.001" placeholder="0.00" step="0.0001" min="0">
+              <div class="amount-usd" id="fromUsd">≈ $103.85</div>
+            </div>
+          </div>
+
+          <div class="swap-arrow">
+            <button class="swap-arrow-btn" id="swapDirection" title="Flip">⇅</button>
+          </div>
+
+          <!-- TO -->
+          <div style="font-size:0.6rem;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">YOU RECEIVE</div>
+          <div class="token-row">
+            <div class="token-info">
+              <div class="token-icon usdt">₮</div>
+              <div>
+                <div class="token-label">USDT</div>
+                <div class="token-sub">SOLANA SPL</div>
+              </div>
+            </div>
+            <div class="token-amount">
+              <input class="amount-input" type="number" id="toAmount" value="103.74" placeholder="0.00" readonly style="color:var(--accent3);">
+              <div class="amount-usd" style="color:var(--accent3);font-size:0.62rem;margin-top:2px;" id="toUsd">BEST QUOTE</div>
+            </div>
+          </div>
+
+          <!-- QUOTE DETAILS -->
+          <div class="quote-box">
+            <div class="quote-row">
+              <span>RATE</span>
+              <span class="val" id="quoteRate">1 BTC = 103,740 USDT</span>
+            </div>
+            <div class="quote-row">
+              <span>NETWORK FEE</span>
+              <span class="val">~$0.82</span>
+            </div>
+            <div class="quote-row">
+              <span>INTERCOM FEE</span>
+              <span class="val">0.05%</span>
+            </div>
+            <div class="quote-row">
+              <span>SETTLEMENT</span>
+              <span class="val good">⚡ ~3-5 SEC</span>
+            </div>
+            <div class="quote-row">
+              <span>SLIPPAGE</span>
+              <span class="val warn" id="slippageVal">0.10%</span>
+            </div>
+          </div>
+
+          <button class="swap-btn" id="swapBtn">INITIATE SWAP →</button>
+        </div>
+      </div>
+
+      <!-- AGENT ACTIVITY -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">INTERCOM AGENT FEED</span>
+          <span style="font-size:0.62rem;color:var(--muted);" id="msgCount">0 MSGS</span>
+        </div>
+        <div class="panel-body" style="padding:16px;">
+          <div class="agent-feed" id="agentFeed"></div>
+        </div>
+      </div>
+
+      <!-- INFO BOX -->
+      <div class="panel" style="border-color:rgba(0,229,255,0.2);">
+        <div class="panel-body" style="font-size:0.68rem;line-height:1.8;color:var(--muted);">
+          <div style="font-family:'Syne',sans-serif;font-weight:600;color:var(--text);margin-bottom:10px;font-size:0.8rem;">HOW IT WORKS</div>
+          <p>TracSwap Radar uses <strong style="color:var(--accent)">Intercom P2P sidechannels</strong> to broadcast swap RFQs across the agent mesh. Makers respond with quotes; best quote is auto-selected. Settlement uses <strong style="color:var(--accent)">HTLC</strong> — BTC over Lightning, USDT on Solana.</p>
+          <br>
+          <p style="font-size:0.62rem;">Built on <a href="https://github.com/Trac-Systems/intercom" style="color:var(--accent);text-decoration:none;">Trac-Systems/intercom</a> · Fork of <a href="https://github.com/TracSystems/intercom-swap" style="color:var(--accent);text-decoration:none;">intercom-swap</a></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap" style="width:100%;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <span>TracSwap Radar · Built on Intercom · Trac Network · 2025</span>
+    <div>
+      <div style="font-size:0.58rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px;">TRAC PAYOUT ADDRESS:</div>
+      <div class="trac-addr">YOUR_TRAC_ADDRESS_HERE</div>
+    </div>
+  </div>
+</footer>
+
+<!-- SWAP MODAL -->
+<div class="modal-overlay" id="swapModal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h2>⚡ Initiating Swap</h2>
+    <p id="modalMsg">Broadcasting RFQ to Intercom agent mesh… collecting quotes from makers…</p>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div style="font-size:0.65rem;color:var(--muted);line-height:1.8;" id="modalSteps">
+      <div>✓ RFQ broadcast over P2P sidechain</div>
+      <div id="s2" style="opacity:0.3;">⟳ Awaiting maker responses…</div>
+      <div id="s3" style="opacity:0.3;">⟳ Negotiating best quote…</div>
+      <div id="s4" style="opacity:0.3;">⟳ Locking HTLC on Lightning…</div>
+      <div id="s5" style="opacity:0.3;">⟳ Releasing USDT on Solana…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA & STATE
+// ============================================================
+let BTC_PRICE = 103847;
+let priceHistory = [];
+for (let i = 60; i >= 0; i--) {
+  priceHistory.push(BTC_PRICE - Math.sin(i * 0.3) * 800 + (Math.random() - 0.5) * 300);
+}
+
+let msgCount = 0;
+let agentCount = 18;
+
+const AGENTS = ['Maker-7F', 'Maker-A2', 'Taker-3B', 'Maker-9C', 'Relay-01', 'Maker-EE', 'Taker-12', 'Maker-4D'];
+const agentMsgs = [
+  (p) => `<strong>RFQ received</strong>: 0.001 BTC → USDT @ ~$${p.toFixed(0)}. Broadcasting to mesh…`,
+  (p) => `<strong>Quote offered</strong>: ${p.toFixed(0)} USDT/BTC — 0.05% fee, ~3s settle`,
+  () => `<strong>HTLC locked</strong>: preimage committed on Lightning channel`,
+  () => `<strong>Swap complete</strong>: USDT released on Solana. Settlement: 4.1s`,
+  (p) => `<strong>New ask</strong>: ${(p+12).toFixed(0)} USDT for 0.005 BTC block`,
+  (p) => `<strong>New bid</strong>: ${(p-8).toFixed(0)} USDT — 0.002 BTC`,
+  () => `<strong>Agent joined mesh</strong>: peer handshake via Intercom sidechain`,
+  () => `<strong>Relay heartbeat</strong>: 18 peers online, avg latency 42ms`,
+  (p) => `<strong>Market update</strong>: BTC/USDT mid = $${p.toFixed(2)}`,
+];
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent =
+    now.toUTCString().slice(17, 25) + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// TICKER
+// ============================================================
+const tickerItems = [
+  { pair: 'BTC/USDT', base: 103847, change: +2.14 },
+  { pair: 'BTC/USDC', base: 103820, change: +2.11 },
+  { pair: 'ETH/USDT', base: 2847, change: -0.82 },
+  { pair: 'SOL/USDT', base: 184.2, change: +1.43 },
+  { pair: 'TRAC/USDT', base: 0.0234, change: +5.2 },
+  { pair: 'LTC/USDT', base: 98.7, change: -0.44 },
+  { pair: 'BNB/USDT', base: 615, change: +0.71 },
+  { pair: 'AVAX/USDT', base: 38.4, change: +2.35 },
+];
+
+function buildTicker() {
+  const inner = document.getElementById('tickerInner');
+  const all = [...tickerItems, ...tickerItems];
+  inner.innerHTML = all.map(t =>
+    `<div class="tick-item">
+      <span class="pair">${t.pair}</span>
+      <span class="price">$${t.base.toLocaleString()}</span>
+      <span class="${t.change >= 0 ? 'up' : 'down'}">${t.change >= 0 ? '+' : ''}${t.change}%</span>
+    </div>`
+  ).join('');
+}
+buildTicker();
+
+// ============================================================
+// CHART
+// ============================================================
+const canvas = document.getElementById('priceChart');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  drawChart();
+}
+
+function drawChart() {
+  const w = canvas.width, h = canvas.height;
+  const data = priceHistory;
+  const min = Math.min(...data) - 200;
+  const max = Math.max(...data) + 200;
+  const range = max - min;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(26,42,58,0.6)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (i / 4) * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(0,229,255,0.15)');
+  grad.addColorStop(1, 'rgba(0,229,255,0)');
+
+  // Draw area
+  ctx.beginPath();
+  data.forEach((p, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((p - min) / range) * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Draw line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 6;
+  data.forEach((p, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((p - min) / range) * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Current price dot
+  const last = data[data.length - 1];
+  const lx = w - 4;
+  const ly = h - ((last - min) / range) * h;
+  ctx.beginPath();
+  ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#00e5ff';
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 100);
+
+// ============================================================
+// ORDER BOOK
+// ============================================================
+function generateBook(mid) {
+  const asks = [], bids = [];
+  let cumAsk = 0, cumBid = 0;
+  for (let i = 0; i < 8; i++) {
+    const spread = (i + 1) * 3.1 + Math.random() * 2;
+    const size = (Math.random() * 0.08 + 0.002).toFixed(4);
+    cumAsk += parseFloat(size);
+    asks.push({ price: mid + spread, size, cum: cumAsk.toFixed(4) });
+    const bsize = (Math.random() * 0.08 + 0.002).toFixed(4);
+    cumBid += parseFloat(bsize);
+    bids.push({ price: mid - spread, size: bsize, cum: cumBid.toFixed(4) });
+  }
+  return { asks: asks.reverse(), bids };
+}
+
+function renderBook(mid) {
+  const { asks, bids } = generateBook(mid);
+  const maxCum = Math.max(asks[asks.length-1].cum, bids[bids.length-1].cum);
+
+  document.getElementById('askBook').innerHTML = asks.map(a =>
+    `<div class="ob-row ask">
+      <div class="depth-bar" style="width:${(a.cum/maxCum*100).toFixed(0)}%"></div>
+      <span>${a.price.toFixed(1)}</span>
+      <span>${a.size}</span>
+      <span>${a.cum}</span>
+    </div>`).join('');
+
+  document.getElementById('bidBook').innerHTML = bids.map(b =>
+    `<div class="ob-row bid">
+      <div class="depth-bar" style="width:${(b.cum/maxCum*100).toFixed(0)}%"></div>
+      <span>${b.price.toFixed(1)}</span>
+      <span>${b.size}</span>
+      <span>${b.cum}</span>
+    </div>`).join('');
+
+  const spread = asks[asks.length-1].price - bids[0].price;
+  document.getElementById('midPrice').textContent = '$' + mid.toFixed(1);
+  document.getElementById('spreadVal').textContent = `$${spread.toFixed(2)} (${(spread/mid*100).toFixed(3)}%)`;
+}
+
+// ============================================================
+// RECENT TRADES
+// ============================================================
+const tradesFeed = document.getElementById('tradesFeed');
+let trades = [];
+
+function addTrade(price) {
+  const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
+  const size = (Math.random() * 0.05 + 0.001).toFixed(4);
+  const now = new Date();
+  const time = now.toUTCString().slice(17, 25);
+  trades.unshift({ side, price: price.toFixed(1), size, time });
+  if (trades.length > 10) trades.pop();
+  tradesFeed.innerHTML = trades.map(t =>
+    `<div class="trade-row">
+      <span class="${t.side === 'BUY' ? 'side-buy' : 'side-sell'}">${t.side}</span>
+      <span>${t.price}</span>
+      <span>${t.size}</span>
+      <span>${t.time}</span>
+    </div>`).join('');
+}
+
+// ============================================================
+// AGENT FEED
+// ============================================================
+function addAgentMsg(price) {
+  const feed = document.getElementById('agentFeed');
+  const agent = AGENTS[Math.floor(Math.random() * AGENTS.length)];
+  const msgFn = agentMsgs[Math.floor(Math.random() * agentMsgs.length)];
+  const text = msgFn(price);
+  const isSystem = text.includes('heartbeat') || text.includes('joined');
+  const tagType = isSystem ? 'sys' : (text.includes('HTLC') || text.includes('complete') ? 'taker' : 'maker');
+  const tagLabel = isSystem ? 'SYS' : tagType.toUpperCase();
+
+  msgCount++;
+  document.getElementById('msgCount').textContent = msgCount + ' MSGS';
+
+  const el = document.createElement('div');
+  el.className = 'agent-msg';
+  el.innerHTML = `
+    <div>
+      <div style="font-size:0.6rem;color:var(--muted);margin-bottom:3px;">${agent}</div>
+      <span class="agent-tag ${tagType}">${tagLabel}</span>
+    </div>
+    <div class="agent-text">${text}</div>
+  `;
+  feed.insertBefore(el, feed.firstChild);
+  while (feed.children.length > 12) feed.removeChild(feed.lastChild);
+}
+
+// ============================================================
+// SWAP INPUT LOGIC
+// ============================================================
+const fromInput = document.getElementById('fromAmount');
+const toInput = document.getElementById('toAmount');
+
+function updateSwapQuote() {
+  const amount = parseFloat(fromInput.value) || 0;
+  const out = amount * BTC_PRICE * 0.9995;
+  toInput.value = out.toFixed(2);
+  document.getElementById('fromUsd').textContent = `≈ $${(amount * BTC_PRICE).toFixed(2)}`;
+  document.getElementById('quoteRate').textContent = `1 BTC = ${BTC_PRICE.toLocaleString()} USDT`;
+  const slip = (Math.random() * 0.05 + 0.05).toFixed(3);
+  document.getElementById('slippageVal').textContent = slip + '%';
+}
+
+fromInput.addEventListener('input', updateSwapQuote);
+
+document.getElementById('swapDirection').addEventListener('click', function() {
+  const tmp = fromInput.value;
+  fromInput.value = toInput.value;
+  toInput.value = tmp;
+});
+
+// ============================================================
+// SWAP MODAL
+// ============================================================
+document.getElementById('swapBtn').addEventListener('click', function() {
+  const modal = document.getElementById('swapModal');
+  modal.classList.add('active');
+  // reset progress
+  const fill = document.getElementById('progressFill');
+  fill.style.animation = 'none';
+  fill.offsetHeight; // reflow
+  fill.style.animation = 'progress 3s ease-in-out forwards';
+
+  const steps = ['s2','s3','s4','s5'];
+  steps.forEach(id => document.getElementById(id).style.opacity = '0.3');
+  steps.forEach((id, i) => {
+    setTimeout(() => {
+      document.getElementById(id).style.opacity = '1';
+      document.getElementById(id).textContent = document.getElementById(id).textContent.replace('⟳', '✓');
+    }, (i + 1) * 700);
+  });
+
+  setTimeout(() => {
+    document.getElementById('modalMsg').textContent = '✅ Swap complete! USDT settled on Solana.';
+    addTrade(BTC_PRICE);
+  }, 3200);
+});
+
+document.getElementById('modalClose').addEventListener('click', function() {
+  document.getElementById('swapModal').classList.remove('active');
+});
+
+// ============================================================
+// MAIN UPDATE LOOP
+// ============================================================
+function updatePrice() {
+  // Random walk
+  const delta = (Math.random() - 0.49) * 80;
+  BTC_PRICE = Math.max(95000, Math.min(115000, BTC_PRICE + delta));
+  priceHistory.push(BTC_PRICE);
+  if (priceHistory.length > 61) priceHistory.shift();
+
+  // Stats
+  document.getElementById('statBtcPrice').textContent = '$' + BTC_PRICE.toLocaleString(undefined, {maximumFractionDigits:0});
+  const chg = ((BTC_PRICE - 101600) / 101600 * 100);
+  const chgEl = document.getElementById('statBtcChange');
+  chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+  chgEl.className = chg >= 0 ? 'up-val' : 'dn-val';
+
+  // Book
+  renderBook(BTC_PRICE);
+
+  // Chart
+  drawChart();
+
+  // Swap quote
+  updateSwapQuote();
+}
+
+function simulateFeed() {
+  addAgentMsg(BTC_PRICE);
+  if (Math.random() > 0.6) addTrade(BTC_PRICE);
+
+  // Random agent count fluctuation
+  agentCount += Math.random() > 0.5 ? 1 : -1;
+  agentCount = Math.max(12, Math.min(34, agentCount));
+  document.getElementById('agentCount').textContent = agentCount + ' AGENTS ONLINE';
+
+  // Active swaps
+  const sw = parseInt(document.getElementById('statSwaps').textContent);
+  document.getElementById('statSwaps').textContent = Math.max(10, Math.min(99, sw + Math.round((Math.random()-0.5)*3)));
+}
+
+// Init
+renderBook(BTC_PRICE);
+updateSwapQuote();
+addAgentMsg(BTC_PRICE);
+addTrade(BTC_PRICE);
+
+// Loops
+setInterval(updatePrice, 2000);
+setInterval(simulateFeed, 3500);
+</script>
+</body>
+</html>
