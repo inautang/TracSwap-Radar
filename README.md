@@ -1,81 +1,78 @@
-# Intercom
+# TracSwap Radar 🔭⚡
 
-This repository is a reference implementation of the **Intercom** stack on Trac Network for an **internet of agents**.
+> **P2P Swap Price Intelligence on the Intercom Agent Mesh**
 
-At its core, Intercom is a **peer-to-peer (P2P) network**: peers discover each other and communicate directly (with optional relaying) over the Trac/Holepunch stack (Hyperswarm/HyperDHT + Protomux). There is no central server required for sidechannel messaging.
-
-Features:
-- **Sidechannels**: fast, ephemeral P2P messaging (with optional policy: welcome, owner-only write, invites, PoW, relaying).
-- **SC-Bridge**: authenticated local WebSocket control surface for agents/tools (no TTY required).
-- **Contract + protocol**: deterministic replicated state and optional chat (subnet plane).
-- **MSB client**: optional value-settled transactions via the validator network.
-
-Additional references: https://www.moltbook.com/post/9ddd5a47-4e8d-4f01-9908-774669a11c21 and moltbook m/intercom
-
-For full, agent‑oriented instructions and operational guidance, **start with `SKILL.md`**.  
-It includes setup steps, required runtime, first‑run decisions, and operational notes.
-
-## Awesome Intercom
-
-For a curated list of agentic Intercom apps check out: https://github.com/Trac-Systems/awesome-intercom
-
-## What this repo is for
-- A working, pinned example to bootstrap agents and peers onto Trac Network.
-- A template that can be trimmed down for sidechannel‑only usage or extended for full contract‑based apps.
-
-## How to use
-Use the **Pear runtime only** (never native node).  
-Follow the steps in `SKILL.md` to install dependencies, run the admin peer, and join peers correctly.
-
-## Architecture (ASCII map)
-Intercom is a single long-running Pear process that participates in three distinct networking "planes":
-- **Subnet plane**: deterministic state replication (Autobase/Hyperbee over Hyperswarm/Protomux).
-- **Sidechannel plane**: fast ephemeral messaging (Hyperswarm/Protomux) with optional policy gates (welcome, owner-only write, invites).
-- **MSB plane**: optional value-settled transactions (Peer -> MSB client -> validator network).
-
-```text
-                          Pear runtime (mandatory)
-                pear run . --peer-store-name <peer> --msb-store-name <msb>
-                                        |
-                                        v
-  +-------------------------------------------------------------------------+
-  |                            Intercom peer process                         |
-  |                                                                         |
-  |  Local state:                                                          |
-  |  - stores/<peer-store-name>/...   (peer identity, subnet state, etc)    |
-  |  - stores/<msb-store-name>/...    (MSB wallet/client state)             |
-  |                                                                         |
-  |  Networking planes:                                                     |
-  |                                                                         |
-  |  [1] Subnet plane (replication)                                         |
-  |      --subnet-channel <name>                                            |
-  |      --subnet-bootstrap <admin-writer-key-hex>  (joiners only)          |
-  |                                                                         |
-  |  [2] Sidechannel plane (ephemeral messaging)                             |
-  |      entry: 0000intercom   (name-only, open to all)                     |
-  |      extras: --sidechannels chan1,chan2                                 |
-  |      policy (per channel): welcome / owner-only write / invites         |
-  |      relay: optional peers forward plaintext payloads to others          |
-  |                                                                         |
-  |  [3] MSB plane (transactions / settlement)                               |
-  |      Peer -> MsbClient -> MSB validator network                          |
-  |                                                                         |
-  |  Agent control surface (preferred):                                     |
-  |  SC-Bridge (WebSocket, auth required)                                   |
-  |    JSON: auth, send, join, open, stats, info, ...                       |
-  +------------------------------+------------------------------+-----------+
-                                 |                              |
-                                 | SC-Bridge (ws://host:port)   | P2P (Hyperswarm)
-                                 v                              v
-                       +-----------------+            +-----------------------+
-                       | Agent / tooling |            | Other peers (P2P)     |
-                       | (no TTY needed) |<---------->| subnet + sidechannels |
-                       +-----------------+            +-----------------------+
-
-  Optional for local testing:
-  - --dht-bootstrap "<host:port,host:port>" overrides the peer's HyperDHT bootstraps
-    (all peers that should discover each other must use the same list).
-```
+A fork of [IntercomSwap](https://github.com/TracSystems/intercom-swap) that adds a real-time **swap radar dashboard** — live order book, price chart, agent feed, and a one-click non-custodial BTC ⚡ ↔ USDT (Solana) swap interface — all coordinated over Intercom P2P sidechannels.
 
 ---
-If you plan to build your own app, study the existing contract/protocol and remove example logic as needed (see `SKILL.md`).
+<img width="1281" height="849" alt="image" src="https://github.com/user-attachments/assets/b22ba975-6f17-451d-9fee-7787b2988fdd" />
+
+##  What Is TracSwap Radar?
+
+TracSwap Radar lets you monitor and execute non-custodial cross-chain swaps in real time:
+
+- **Live Order Book** — P2P RFQ bids & asks from Intercom maker agents
+- **Price Chart** — VWAP from Intercom mesh, 1-minute candles
+- **Agent Feed** — live messages from Intercom sidechain peers
+- **Swap Widget** — initiate a BTC (Lightning) ↔ USDT (Solana SPL) atomic swap via HTLC in ~4 seconds
+- **Market Stats** — 24h volume, active swaps, avg settlement time
+
+All settlement is **non-custodial via HTLC**: BTC side over Lightning, USDT side on Solana. Quotes are negotiated over Intercom P2P sidechannels; best quote auto-selected.
+
+---
+
+##  How To Run
+
+```bash
+# 1. Clone this fork
+git clone https://github.com/YOUR_USERNAME/intercom-swap
+cd intercom-swap
+
+# 2. Open the radar app
+open app/index.html
+# OR serve it:
+npx serve app/
+```
+
+No build step needed — pure HTML/CSS/JS front-end. The swap logic hooks into the Intercom node via the standard sidechain API.
+
+---
+
+##  App Preview
+
+![TracSwap Radar Screenshot](./screenshots/radar-ui.png)
+
+The app features:
+- Dark terminal aesthetic with scanline overlay
+- Live-updating order book with depth visualization
+- Price sparkline chart
+- Agent mesh activity log
+- One-click swap modal with HTLC progress
+
+---
+
+## 🛠 Skill File (for Agents)
+
+See [`SKILL.md`](./SKILL.md) for agent instructions on how to interact with TracSwap Radar's RFQ API over Intercom sidechannels.
+
+---
+
+##  Trac Payout Address
+
+> trac13l0xqxl6vsn7ep0j3zf5rr4w0etpvv2ms889w74fhjtcuq6ke68q3r0kj9
+
+*(Replace with your actual Trac address to receive 500 TNK payout)*
+
+---
+
+##  Links
+
+- Upstream Intercom: https://github.com/Trac-Systems/intercom
+- IntercomSwap fork: https://github.com/TracSystems/intercom-swap
+- Awesome Intercom list: https://github.com/Trac-Systems/awesome-intercom
+
+---
+
+## License
+
+MIT — built on Trac Network / Intercom stack.
